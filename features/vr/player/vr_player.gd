@@ -41,6 +41,8 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	input_adapter.update_desktop_hands()
+	if input_adapter.flight_toggle_pressed():
+		locomotion.set_flight_mode(not locomotion.flight_mode)
 	var aiming := input_adapter.teleport_pressed() and _blackout_time <= 0.0
 	teleport.update_target(aiming)
 	if _teleport_was_pressed and not aiming and _blackout_time <= 0.0 and input_adapter.can_teleport() and teleport.confirm_destination():
@@ -56,13 +58,13 @@ func _physics_process(delta: float) -> void:
 		teleport.cancel()
 	_teleport_was_pressed = aiming
 	_blackout_time = maxf(0.0, _blackout_time - delta)
-	locomotion.tick(delta, input_adapter.move_vector(), input_adapter.turn_value(), not aiming and _blackout_time <= 0.0)
+	locomotion.tick(delta, input_adapter.move_vector(), input_adapter.turn_value(), not aiming and _blackout_time <= 0.0, input_adapter.flight_vertical_value())
 	left_hand.tick(delta, input_adapter.grip_value(left_hand), input_adapter.use_value(left_hand), _blackout_time <= 0.0)
 	right_hand.tick(delta, input_adapter.grip_value(right_hand), input_adapter.use_value(right_hand), not aiming and _blackout_time <= 0.0)
 	var moving := settings.continuous_movement and Vector2(velocity.x, velocity.z).length() > 0.1
 	var material := comfort.material_override as ShaderMaterial
 	material.set_shader_parameter("vignette", settings.vignette_strength if moving else 0.0)
-	head_collision.tick()
+	head_collision.tick(not locomotion.flight_mode)
 	material.set_shader_parameter("blackout", 1.0 if _blackout_time > 0.0 or head_collision.obstructed else 0.0)
 
 func toggle_movement() -> void:
@@ -74,6 +76,7 @@ func toggle_seated() -> void:
 func reset_player() -> void:
 	left_hand.cancel()
 	right_hand.cancel()
+	locomotion.set_flight_mode(false)
 	locomotion.teleport_to(_spawn)
 
 func _on_focus_changed(focused: bool) -> void:

@@ -52,7 +52,17 @@ func tick(delta: float, grip_amount: float, use_amount: float, enabled: bool = t
 	var grip_now := grip_amount >= (_settings.release_threshold if _grip_down else _settings.grab_threshold)
 	var use_now := use_amount >= (_settings.release_threshold if _use_down else _settings.grab_threshold)
 	if grip_now and not _grip_down and focused != null and focused.has_method("begin_grab"):
-		if bool(focused.call("begin_grab", hold_point)):
+		var grabbed_successfully: bool = false
+		if focused.has_method("begin_surface_grab"):
+			var hit_point := grip.global_position
+			var hit_normal := Vector3.UP
+			if ray.is_colliding() and ray.get_collider() == focused:
+				hit_point = ray.get_collision_point()
+				hit_normal = ray.get_collision_normal()
+			grabbed_successfully = bool(focused.call("begin_surface_grab", hold_point, hit_point, hit_normal))
+		else:
+			grabbed_successfully = bool(focused.call("begin_grab", hold_point))
+		if grabbed_successfully:
 			held = focused
 			grabbed.emit(held)
 			pulse(0.35)

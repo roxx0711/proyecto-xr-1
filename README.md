@@ -1,10 +1,10 @@
-# Plantilla VR · Godot 4.7 / Quest 3
+# INACAP Renca VR · Godot 4.7 / Quest 3S
 
-Base reutilizable de realidad virtual con OpenXR para Oculus / Meta Quest 3. Nace del campo de pruebas XR de INACAP Renca 2026. Las referencias de interacción son VRChat y Half-Life: Alyx; la plantilla aporta locomoción y manipulación para construir experiencias propias.
+Base reutilizable de realidad virtual con OpenXR para Oculus / Meta Quest. Incluye una prueba de concepto interactiva con el modelo 3D de la sede INACAP Renca y un laboratorio de componentes VR reutilizables.
 
 ## Probar
 
-Abre `project.godot` con Godot 4.7.2 y ejecuta con F5. La escena principal es `examples/interaction_lab/interaction_lab.tscn`. Si OpenXR está inicializado se utiliza el visor; en PC sin runtime se utiliza escritorio. En Android, un fallo de OpenXR cierra la aplicación con error.
+Abre `project.godot` con Godot 4.7.2 y ejecuta con F5. La escena principal es `examples/campus_poc/campus_poc.tscn`. Si OpenXR está inicializado se utiliza el visor; en PC sin runtime se utiliza escritorio. En Android, un fallo de OpenXR cierra la aplicación con error.
 
 Desde PowerShell, en la raíz:
 
@@ -20,7 +20,24 @@ Desde PowerShell, en la raíz:
 
 El helper acepta `-GodotPath` o `GODOT_PATH`. La instalación local está en una **carpeta** llamada `C:\Users\sebas\Downloads\Godot_v4.7.2-stable_win64.exe`; dentro están los ejecutables normal y `_console.exe`.
 
-## Controles
+## Prueba de concepto: sede INACAP Renca
+
+La escena principal importa `assets/models/scene.glb`, presenta la sede a escala 3× para que el jugador conserve proporciones humanas y amplía el suelo para cubrirla. Conserva los materiales y normales del modelo, agrupa las piezas con sufijo `_mm` en su edificio y muestra las superficies por ambos lados para poder inspeccionar los interiores. En vez de mover o escalar el edificio completo, Grip agarra un punto de la malla y arrastra solo los vértices cercanos con una caída suave. Si quieres abrir una pared, mantén Grip y pulsa el gatillo/clic para desprender el parche apuntado; suéltalo y vuelve a usar el gatillo/clic para restaurar el bloque.
+
+| Acción | Quest / XR | Escritorio |
+| --- | --- | --- |
+| Apuntar / seleccionar | Mano y rayo de interacción | Mirar con ratón |
+| Deformar una zona local | Mantener Grip y mover la mano | Mantener F (izquierda) o G (derecha) y arrastrar el ratón |
+| Cambiar alcance de la mano al agarrar | Acercar o alejar físicamente la mano | Rueda del ratón |
+| Retirar un panel de pared | Con Grip sujeto, pulsar gatillo | Con F/G sujeto, clic |
+| Restaurar un bloque | Soltar Grip y pulsar gatillo al apuntarlo | Soltar F/G y hacer clic |
+| Caminar con colisión / volar sin colisión | Stick izquierdo / B-Y para alternar / stick derecho vertical para subir y bajar | WASD / V para alternar / Espacio-X para subir y bajar |
+| Teletransportar / girar por pasos | A / stick derecho horizontal | T / Q-E |
+| Capturar/liberar ratón | — | Esc |
+
+El modo caminar tiene gravedad y colisiona con el suelo y la malla de los edificios; el modo vuelo permite atravesarlos para inspeccionar interiores. El teletransporte y el giro por pasos siguen disponibles. La deformación local y el desprendimiento usan el mismo contrato de agarre/uso en escritorio y XR.
+
+## Controles del laboratorio VR
 
 | Acción | Quest / Touch | Escritorio |
 | --- | --- | --- |
@@ -32,7 +49,7 @@ El helper acepta `-GodotPath` o `GODOT_PATH`. La instalación local está en una
 | Mirar / agacharse | Movimiento físico del visor | Ratón para mirar |
 | Liberar / capturar ratón | — | Esc |
 
-Activa **Movimiento libre** en el panel para caminar con el stick o WASD. Por defecto se usa teletransporte y giro de 30°. El panel permite modo sentado, abrir / cerrar puerta y reiniciar. El modo sentado añade altura configurable al origen sin sobrescribir la pose del visor.
+El laboratorio conserva su modo teletransporte y giro de 30° por defecto. El panel permite movimiento libre, modo sentado, abrir/cerrar puerta y reiniciar. El modo sentado añade altura configurable al origen sin sobrescribir la pose del visor.
 
 ## Laboratorio de ejemplo
 
@@ -56,6 +73,8 @@ features/vr/
   locomotion/   teletransporte y validación de destino
   interaction/  objetos, botones, linterna, palanca, encaje y puerta
   session/      ciclo de vida OpenXR y límite físico
+features/campus/  importación del modelo GLB y manipulación de bloques
+examples/campus_poc/  prueba de concepto de la sede INACAP Renca
 examples/interaction_lab/  sala y conexiones entre estaciones
 tools/                    ejecución, generación y verificación
 scenes/                   entradas de compatibilidad del proyecto original
@@ -96,7 +115,7 @@ Rayos: máscara 11 (World + Grabbable + Interactable); una pared bloquea el alca
 5. Instancia escenas de interaction/ y ajusta sus exports. Para otros modelos, adapta mesh y shape y conserva los nombres únicos utilizados por su script.
 6. Cambia **player/default_vr_settings.tres** o asigna otro VRSettings a VRPlayer.defaults. Cada jugador duplica su configuración; los cambios de confort son locales.
 7. Conecta VRButton.activated, VRLever.value_changed, VRSocket.inserted o VRGrabbable.used con tu lógica. La linterna muestra cómo extender un objeto usable.
-8. Selecciona tu escena principal y elimina el laboratorio cuando ya no lo necesites.
+8. Selecciona tu escena principal; la escena de campus es una prueba de concepto y el laboratorio sigue disponible para probar componentes.
 
 Contrato de interacción: begin_grab(anchor) -> bool, end_grab(velocity), use(anchor) y get_prompt() -> String. Implementa los métodos necesarios en el cuerpo detectado. Objetos movibles: seguimiento físico en _integrate_forces(), sin cambiar de padre. Los controles fijos liberan el agarre al teletransportar; los objetos movibles retenidos acompañan al jugador.
 

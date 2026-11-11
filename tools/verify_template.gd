@@ -69,7 +69,16 @@ func run_checks() -> void:
 	# Actual input adapter maps desktop actions to the same grip state as OpenXR.
 	Input.action_press(&"desktop_grab_left")
 	check(player.input_adapter.grip_value(player.left_hand) == 1.0, "Desktop grip adapter")
+	var previous_mouse_mode := Input.mouse_mode
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	player.input_adapter.update_desktop_hands()
+	var hand_before_drag := player.left_hand.grip.global_position
+	player.input_adapter._drag_desktop_hands(Vector2(0.0, -50.0))
+	player.input_adapter.update_desktop_hands()
+	check(player.left_hand.grip.global_position.y > hand_before_drag.y + 0.1, "Desktop mouse drag moves the virtual hand while gripping")
 	Input.action_release(&"desktop_grab_left")
+	player.input_adapter.update_desktop_hands()
+	Input.mouse_mode = previous_mouse_mode
 	# Snapshot camera position during rotation and off-center teleport.
 	var head_before := player.camera.global_position
 	player.locomotion.snap_turn(30.0)
@@ -181,6 +190,73 @@ func run_checks() -> void:
 	await frames(20)
 	check(not player.settings.continuous_movement and socket.occupant == null, "Demo reset restores comfort mode and socket")
 	check(key.global_position.distance_to(Vector3(-2.5, 1.0, 0.3)) < 0.25, "Demo reset restores props")
+	var campus := (load("res://examples/campus_poc/campus_poc.tscn") as PackedScene).instantiate()
+	var campus_preview := campus.get_node_or_null("CampusModel/ModelPreview") as Node3D
+	check(campus_preview != null and campus_preview.visible, "Campus GLB is visible in the editor scene")
+	root.add_child(campus)
+	current_scene = campus
+	await frames(5)
+	check(campus_preview != null and not campus_preview.visible, "Runtime uses the interactive campus meshes instead of duplicating the preview")
+	var campus_buildings := get_nodes_in_group(&"campus_building")
+	check(campus_buildings.size() == 14, "Campus model exposes each movable building as an individual object")
+	var building := campus.get_node("CampusModel/B") as CampusBuilding
+	var building_mesh := building.get_node("Visual") as MeshInstance3D
+	check(building_mesh.mesh != null and building_mesh.mesh.get_surface_count() > 0, "Campus building mesh imports with geometry")
+	check(building_mesh.get_aabb().size.y > 16.0, "Campus is enlarged for human-scale VR")
+	check(building_mesh.mesh.get_surface_count() >= 6, "GLB sub-meshes are grouped into their building")
+	var building_material := building_mesh.mesh.surface_get_material(0) as BaseMaterial3D
+	check(building_material != null and building_material.cull_mode == BaseMaterial3D.CULL_DISABLED, "Imported building materials render interior faces")
+	check(building.get_node("CollisionShape").shape is ConcavePolygonShape3D, "Campus buildings use mesh-accurate walk collision")
+	var stretch_anchor := Node3D.new()
+	campus.add_child(stretch_anchor)
+	var original_mesh := building_mesh.mesh as ArrayMesh
+	var original_vertices: PackedVector3Array = original_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var original_vertex_count := 0
+	for surface_index: int in range(original_mesh.get_surface_count()):
+		var surface_arrays: Array = original_mesh.surface_get_arrays(surface_index)
+		var surface_vertices: PackedVector3Array = surface_arrays[Mesh.ARRAY_VERTEX]
+		original_vertex_count += surface_vertices.size()
+	var grab_point := original_vertices[0]
+	var face_normal := (original_vertices[1] - original_vertices[0]).cross(original_vertices[2] - original_vertices[0]).normalized()
+	stretch_anchor.global_position = building.to_global(grab_point)
+	var building_position := building.global_position
+	check(building.begin_surface_grab(stretch_anchor, building.to_global(grab_point), building.global_basis * face_normal), "Campus building accepts a precise surface grab point")
+	stretch_anchor.global_position += Vector3.UP * 1.0
+	await frames(3)
+	var deformed_vertices := building._deform_vertices(original_vertices, building._pull_offset)
+	check(building.global_position.distance_to(building_position) < 0.001, "Local deformation does not move the complete building")
+	check(not deformed_vertices[0].is_equal_approx(original_vertices[0]), "Moving the hand deforms the grabbed mesh region")
+	check(((building_mesh.mesh as ArrayMesh).surface_get_format(0) & Mesh.ARRAY_FLAG_USE_DYNAMIC_UPDATE) != 0, "Campus mesh supports vertex buffer updates")
+	building.end_grab(Vector3.ZERO)
+	building.reset_building()
+	grab_point = (original_vertices[0] + original_vertices[1] + original_vertices[2]) / 3.0
+	stretch_anchor.global_position = building.to_global(grab_point)
+	check(building.begin_surface_grab(stretch_anchor, building.to_global(grab_point), building.global_basis * face_normal), "Campus building can grab a wall panel for removal")
+	building.use(stretch_anchor)
+	var detached_vertex_count := 0
+	var detached_mesh := building_mesh.mesh as ArrayMesh
+	for surface_index: int in range(detached_mesh.get_surface_count()):
+		var surface_arrays: Array = detached_mesh.surface_get_arrays(surface_index)
+		var surface_vertices: PackedVector3Array = surface_arrays[Mesh.ARRAY_VERTEX]
+		detached_vertex_count += surface_vertices.size()
+	check(detached_vertex_count < original_vertex_count, "Using while gripping removes a local wall panel")
+	building.end_grab(Vector3.ZERO)
+	building.use(stretch_anchor)
+	check((building_mesh.mesh as ArrayMesh).get_surface_count() > 0, "Using an unheld building restores its mesh")
+	var campus_player := campus.get_node("VRPlayer") as VRPlayer
+	check(campus_player.scale.distance_to(Vector3.ONE) < 0.001, "Player remains at human scale")
+	check(campus_player.global_position.z > 96.0 and campus_player.global_position.z < 110.0, "Player starts outside the enlarged campus")
+	var walking_collision_mask := campus_player.collision_mask
+	campus_player.locomotion.set_flight_mode(true)
+	check(campus_player.collision_mask == 0, "Flight mode disables player collisions")
+	campus_player.locomotion.set_flight_mode(false)
+	check(campus_player.collision_mask == walking_collision_mask, "Walking mode restores player collisions")
+	Input.action_press(&"desktop_fly_toggle")
+	check(campus_player.input_adapter.flight_toggle_pressed(), "Desktop flight toggle input")
+	Input.action_release(&"desktop_fly_toggle")
+	campus_player.input_adapter.flight_toggle_pressed()
+	campus.queue_free()
+	await process_frame
 	# F6: each reusable scene can run without a lab singleton.
 	for path: String in ["player/vr_player.tscn", "hands/vr_hand.tscn", "interaction/vr_grabbable.tscn", "interaction/vr_button.tscn", "interaction/vr_lever.tscn", "interaction/vr_socket.tscn", "interaction/vr_door.tscn", "interaction/vr_flashlight.tscn", "locomotion/vr_teleport.tscn"]:
 		var instance := (load("res://features/vr/" + path) as PackedScene).instantiate()

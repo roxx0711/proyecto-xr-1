@@ -14,7 +14,12 @@ func configure(head: XRCamera3D) -> void:
 	_query.shape = sphere
 	_query.collision_mask = 9
 
-func tick() -> void:
+func tick(enabled: bool = true) -> void:
+	if not enabled:
+		if obstructed:
+			obstructed = false
+			obstruction_changed.emit(false)
+		return
 	_query.transform = Transform3D(Basis.IDENTITY, _head.global_position)
 	var blocked := not _head.get_world_3d().direct_space_state.intersect_shape(_query, 1).is_empty()
 	if blocked != obstructed:
