@@ -3,14 +3,19 @@
 [ext_resource type="Script" uid="uid://ds48mkllddl67" path="res://features/campus/campus_poc.gd" id="1_poc"]
 [ext_resource type="Script" uid="uid://b3wvbhhoshgfq" path="res://features/campus/campus_model.gd" id="2_model"]
 [ext_resource type="PackedScene" path="res://features/vr/player/vr_player.tscn" id="3_player"]
-[ext_resource type="PackedScene" path="res://assets/models/scene.glb" id="4_preview"]
+[ext_resource type="PackedScene" uid="uid://dg0nmj2kkbja1" path="res://assets/models/scene.glb" id="4_preview"]
 
-[sub_resource type="Environment" id="Environment_campus"]
-background_mode = 1
-background_color = Color(0.035, 0.065, 0.09, 1)
-ambient_light_source = 2
-ambient_light_color = Color(0.78, 0.84, 0.9, 1)
-ambient_light_energy = 0.72
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_eoxq3"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_qdvut"]
+sky_material = SubResource("ProceduralSkyMaterial_eoxq3")
+
+[sub_resource type="Environment" id="Environment_mynlu"]
+background_mode = 2
+sky = SubResource("Sky_qdvut")
+ssao_enabled = true
 
 [sub_resource type="StandardMaterial3D" id="Material_ground"]
 albedo_color = Color(0.19, 0.25, 0.22, 1)
@@ -25,11 +30,11 @@ size = Vector3(420, 0.2, 330)
 [node name="CampusPOC" type="Node3D" unique_id=489392308]
 script = ExtResource("1_poc")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=436664611]
-environment = SubResource("Environment_campus")
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=470173478]
+environment = SubResource("Environment_mynlu")
 
 [node name="KeyLight" type="DirectionalLight3D" parent="." unique_id=248331771]
-transform = Transform3D(0.8253356, 0.44229966, -0.3509874, 0, 0.62161, 0.7833269, 0.5646425, -0.6465076, 0.51303685, 0, 0, 0)
+transform = Transform3D(0.8253356, 0.44229966, -0.35098737, 0, 0.62161, 0.7833269, 0.5646425, -0.6465076, 0.51303685, 0, 17.012669, 0)
 light_energy = 1.1
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1688611377 groups=["vr_teleportable"]]
@@ -45,14 +50,13 @@ shape = SubResource("BoxShape3D_ground")
 [node name="CampusModel" type="Node3D" parent="." unique_id=890483999]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.04973817, 0)
 script = ExtResource("2_model")
-source_model = "res://assets/models/scene.glb"
 
-[node name="ModelPreview" parent="CampusModel" instance=ExtResource("4_preview")]
+[node name="ModelPreview" parent="CampusModel" unique_id=28945015 instance=ExtResource("4_preview")]
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, -15.60045, 8.49792, 88.59477)
 
 [node name="VRPlayer" parent="." unique_id=1986006715 instance=ExtResource("3_player")]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 104)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 122.48457, 11.977795, 21.001543)
 
 [node name="DesktopHelp" type="CanvasLayer" parent="." unique_id=677303896]
 unique_name_in_owner = true
@@ -66,7 +70,7 @@ offset_bottom = 184.0
 theme_override_colors/font_color = Color(0.92, 0.96, 1, 1)
 theme_override_font_sizes/font_size = 16
 text = "MODELO: assets/models/scene.glb
-ESCRITORIO · WASD: caminar · V: alternar vuelo sin colisión / caminar con colisión · Espacio/X: subir/bajar volando
+ESCRITORIO · WASD: caminar · Espacio: saltar · doble Espacio o V: alternar vuelo · Shift: subir · Ctrl/X: bajar volando
 Ratón: mirar/apuntar · F/G + arrastrar: deformar solo la zona agarrada · rueda: ajustar alcance
 Con Grip/F/G sujeto: gatillo/clic retira un panel de pared · sin sujetar: gatillo/clic restaura el bloque
 Q/E: giro por pasos · T: teletransportar · Esc: liberar/capturar ratón

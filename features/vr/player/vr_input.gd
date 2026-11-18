@@ -1,6 +1,7 @@
 class_name VRInput
 extends Node
 ## Desktop adapter and OpenXR share exactly the same gameplay commands.
+const FLIGHT_DOUBLE_TAP_WINDOW_MSEC: int = 350
 @export var move_action: StringName = &"primary"
 @export var turn_action: StringName = &"primary"
 @export var grip_action: StringName = &"grip"
@@ -16,6 +17,9 @@ var _right: VRHand
 var _left_desktop_offset: Vector3 = Vector3.ZERO
 var _right_desktop_offset: Vector3 = Vector3.ZERO
 var _flight_button_down: bool = false
+var _jump_pressed: bool = false
+var _space_double_tap: bool = false
+var _last_space_press_msec: int = -1
 
 func configure(active: bool, body: CharacterBody3D, camera: XRCamera3D, left: VRHand, right: VRHand) -> void:
 	xr_active = active
@@ -76,6 +80,21 @@ func update_desktop_hands() -> void:
 		hand.grip.global_transform = _camera.global_transform.translated_local(Vector3(side * 0.22 + offset.x, -0.22 + offset.y, -0.4 + offset.z))
 		hand.aim.global_transform = hand.grip.global_transform
 
+func update_desktop_actions() -> void:
+	_jump_pressed = false
+	_space_double_tap = false
+	if xr_active or not Input.is_action_just_pressed(&"desktop_jump"):
+		return
+	_register_desktop_jump_press(Time.get_ticks_msec())
+
+func _register_desktop_jump_press(current_time_msec: int) -> void:
+	_space_double_tap = _last_space_press_msec >= 0 and current_time_msec - _last_space_press_msec <= FLIGHT_DOUBLE_TAP_WINDOW_MSEC
+	if _space_double_tap:
+		_last_space_press_msec = -1
+	else:
+		_last_space_press_msec = current_time_msec
+	_jump_pressed = not _space_double_tap
+
 func move_vector() -> Vector2:
 	if xr_active:
 		var axis := _left.grip.get_vector2(move_action) if _left.grip.get_has_tracking_data() else Vector2.ZERO
@@ -92,12 +111,15 @@ func flight_vertical_value() -> float:
 		return -_right.grip.get_vector2(move_action).y if _right.grip.get_has_tracking_data() else 0.0
 	return Input.get_axis(&"desktop_fly_down", &"desktop_fly_up")
 
+func jump_pressed() -> bool:
+	return _jump_pressed
+
 func flight_toggle_pressed() -> bool:
 	if not xr_active:
 		var pressed := Input.is_action_pressed(&"desktop_fly_toggle")
 		var just_pressed := pressed and not _flight_button_down
 		_flight_button_down = pressed
-		return just_pressed
+		return just_pressed or _space_double_tap
 	var pressed := _right.aim.get_has_tracking_data() and _right.aim.is_button_pressed(flight_action)
 	var just_pressed := pressed and not _flight_button_down
 	_flight_button_down = pressed

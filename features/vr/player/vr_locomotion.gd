@@ -5,6 +5,7 @@ signal turned(degrees: float)
 signal teleported(destination: Vector3)
 signal flight_mode_changed(enabled: bool)
 const FLIGHT_SPEED: float = 8.0
+const JUMP_VELOCITY: float = 3.5
 var body: CharacterBody3D
 var camera: XRCamera3D
 var origin: XROrigin3D
@@ -12,7 +13,6 @@ var body_shape: CollisionShape3D
 var settings: VRSettings
 var _turn_armed: bool = true
 var _gravity: float = 9.8
-var _walking_collision_mask: int = 0
 var flight_mode: bool = false
 
 func configure(player_body: CharacterBody3D, head: XRCamera3D, xr_origin: XROrigin3D, shape: CollisionShape3D, config: VRSettings) -> void:
@@ -21,10 +21,9 @@ func configure(player_body: CharacterBody3D, head: XRCamera3D, xr_origin: XROrig
 	origin = xr_origin
 	body_shape = shape
 	settings = config
-	_walking_collision_mask = player_body.collision_mask
 	_gravity = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
 
-func tick(delta: float, move_input: Vector2, turn_input: float, allow_move: bool = true, flight_vertical: float = 0.0) -> void:
+func tick(delta: float, move_input: Vector2, turn_input: float, allow_move: bool = true, flight_vertical: float = 0.0, jump_requested: bool = false) -> void:
 	_update_capsule()
 	if absf(turn_input) < settings.stick_deadzone:
 		_turn_armed = true
@@ -43,7 +42,9 @@ func tick(delta: float, move_input: Vector2, turn_input: float, allow_move: bool
 		direction = (right * move_input.x - forward * move_input.y).limit_length(1.0)
 	body.velocity.x = direction.x * settings.move_speed
 	body.velocity.z = direction.z * settings.move_speed
-	if body.is_on_floor():
+	if jump_requested and allow_move and body.is_on_floor():
+		body.velocity.y = JUMP_VELOCITY
+	elif body.is_on_floor():
 		body.velocity.y = 0.0
 	else:
 		body.velocity.y -= _gravity * delta
@@ -72,7 +73,6 @@ func set_flight_mode(enabled: bool) -> void:
 	if flight_mode == enabled:
 		return
 	flight_mode = enabled
-	body.collision_mask = 0 if enabled else _walking_collision_mask
 	body.velocity = Vector3.ZERO
 	body.reset_physics_interpolation()
 	flight_mode_changed.emit(enabled)

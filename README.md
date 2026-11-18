@@ -22,7 +22,7 @@ El helper acepta `-GodotPath` o `GODOT_PATH`. La instalación local está en una
 
 ## Prueba de concepto: sede INACAP Renca
 
-La escena principal importa `assets/models/scene.glb`, presenta la sede a escala 3× para que el jugador conserve proporciones humanas y amplía el suelo para cubrirla. Conserva los materiales y normales del modelo, agrupa las piezas con sufijo `_mm` en su edificio y muestra las superficies por ambos lados para poder inspeccionar los interiores. En vez de mover o escalar el edificio completo, Grip agarra un punto de la malla y arrastra solo los vértices cercanos con una caída suave. Si quieres abrir una pared, mantén Grip y pulsa el gatillo/clic para desprender el parche apuntado; suéltalo y vuelve a usar el gatillo/clic para restaurar el bloque.
+La escena principal importa `assets/models/scene.glb`, presenta la sede a escala 3× para que el jugador conserve proporciones humanas y amplía el suelo para cubrirla. Conserva las normales del modelo, aplica la paleta del campus a sus materiales y usa el color del suelo en las superficies restantes sin color asignado. Agrupa las piezas con sufijo `_mm` en su edificio y muestra las superficies por ambos lados para poder inspeccionar los interiores. En vez de mover o escalar el edificio completo, Grip agarra un punto de la malla y arrastra solo los vértices cercanos con una caída suave. Si quieres abrir una pared, mantén Grip y pulsa el gatillo/clic para desprender el parche apuntado; suéltalo y vuelve a usar el gatillo/clic para restaurar el bloque.
 
 | Acción | Quest / XR | Escritorio |
 | --- | --- | --- |
@@ -31,7 +31,7 @@ La escena principal importa `assets/models/scene.glb`, presenta la sede a escala
 | Cambiar alcance de la mano al agarrar | Acercar o alejar físicamente la mano | Rueda del ratón |
 | Retirar un panel de pared | Con Grip sujeto, pulsar gatillo | Con F/G sujeto, clic |
 | Restaurar un bloque | Soltar Grip y pulsar gatillo al apuntarlo | Soltar F/G y hacer clic |
-| Caminar con colisión / volar sin colisión | Stick izquierdo / B-Y para alternar / stick derecho vertical para subir y bajar | WASD / V para alternar / Espacio-X para subir y bajar |
+| Caminar / volar, siempre con colisiones del mundo | Stick izquierdo / B-Y para alternar / stick derecho vertical para subir y bajar | WASD / Espacio para saltar / doble Espacio o V para alternar vuelo / Shift para subir, Ctrl o X para bajar |
 | Teletransportar / girar por pasos | A / stick derecho horizontal | T / Q-E |
 | Capturar/liberar ratón | — | Esc |
 

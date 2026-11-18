@@ -17,6 +17,11 @@ func frames(count: int = 3) -> void:
 		await physics_frame
 
 func run_checks() -> void:
+	var has_ctrl_fly_down := false
+	for event: InputEvent in InputMap.action_get_events(&"desktop_fly_down"):
+		if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_CTRL:
+			has_ctrl_fly_down = true
+	check(has_ctrl_fly_down, "Ctrl can lower the player during desktop flight")
 	lab = load("res://examples/interaction_lab/interaction_lab.tscn").instantiate()
 	root.add_child(lab)
 	current_scene = lab
@@ -206,6 +211,52 @@ func run_checks() -> void:
 	check(building_mesh.mesh.get_surface_count() >= 6, "GLB sub-meshes are grouped into their building")
 	var building_material := building_mesh.mesh.surface_get_material(0) as BaseMaterial3D
 	check(building_material != null and building_material.cull_mode == BaseMaterial3D.CULL_DISABLED, "Imported building materials render interior faces")
+	check(building_material != null and building_material.albedo_color.is_equal_approx(Color(0.72, 0.36, 0.26, 1.0)), "Campus buildings use the terracotta color")
+	var dark_letter_found := false
+	var red_inacap_letter_found := false
+	for surface_index: int in range(building_mesh.mesh.get_surface_count()):
+		var surface_material := building_mesh.mesh.surface_get_material(surface_index) as BaseMaterial3D
+		if surface_material == null:
+			continue
+		if surface_material.resource_name.begins_with("Letras_"):
+			dark_letter_found = surface_material.albedo_color.is_equal_approx(Color(0.2, 0.2, 0.2, 1.0))
+		elif surface_material.resource_name.begins_with("Rojo_INACAP"):
+			red_inacap_letter_found = surface_material.albedo_color.is_equal_approx(Color(0.78, 0.12, 0.08, 1.0))
+	check(dark_letter_found, "White building lettering becomes dark gray")
+	check(red_inacap_letter_found, "First INACAP letter remains red")
+	var inacap_sign := campus.get_node("CampusModel/CampusCollision_Letras_INACAP/Visual") as MeshInstance3D
+	var black_inacap_letters_found := false
+	var red_inacap_initial_found := false
+	for surface_index: int in range(inacap_sign.mesh.get_surface_count()):
+		var surface_material := inacap_sign.mesh.surface_get_material(surface_index) as BaseMaterial3D
+		if surface_material == null:
+			continue
+		if surface_material.resource_name.begins_with("Letras_"):
+			black_inacap_letters_found = surface_material.albedo_color.is_equal_approx(Color.BLACK)
+		elif surface_material.resource_name.begins_with("Rojo_INACAP"):
+			red_inacap_initial_found = surface_material.albedo_color.is_equal_approx(Color(0.78, 0.12, 0.08, 1.0))
+	check(black_inacap_letters_found, "INACAP Renca letters become black")
+	check(red_inacap_initial_found, "INACAP initial stays red")
+	var dark_zinc_found := false
+	for campus_object: Node in campus.get_node("CampusModel").get_children():
+		var visual := campus_object.get_node_or_null("Visual") as MeshInstance3D
+		if visual == null or visual.mesh == null:
+			continue
+		for surface_index: int in range(visual.mesh.get_surface_count()):
+			var surface_material := visual.mesh.surface_get_material(surface_index) as BaseMaterial3D
+			if surface_material != null and surface_material.resource_name == "Zinc_Claro__base":
+				dark_zinc_found = surface_material.albedo_color.is_equal_approx(Color(0.2, 0.2, 0.2, 1.0))
+	check(dark_zinc_found, "Light zinc surfaces become dark gray")
+	var white_surface_found := false
+	for campus_object: Node in campus.get_node("CampusModel").get_children():
+		var visual := campus_object.get_node_or_null("Visual") as MeshInstance3D
+		if visual == null or visual.mesh == null:
+			continue
+		for surface_index: int in range(visual.mesh.get_surface_count()):
+			var surface_material := visual.mesh.surface_get_material(surface_index) as BaseMaterial3D
+			if surface_material != null and surface_material.albedo_color.is_equal_approx(Color.WHITE):
+				white_surface_found = true
+	check(not white_surface_found, "Remaining white campus surfaces use the floor color")
 	check(building.get_node("CollisionShape").shape is ConcavePolygonShape3D, "Campus buildings use mesh-accurate walk collision")
 	var stretch_anchor := Node3D.new()
 	campus.add_child(stretch_anchor)
@@ -246,11 +297,27 @@ func run_checks() -> void:
 	var campus_player := campus.get_node("VRPlayer") as VRPlayer
 	check(campus_player.scale.distance_to(Vector3.ONE) < 0.001, "Player remains at human scale")
 	check(campus_player.global_position.z > 96.0 and campus_player.global_position.z < 110.0, "Player starts outside the enlarged campus")
+	check(campus_player.settings.continuous_movement, "Campus scene enables its documented walking controls")
 	var walking_collision_mask := campus_player.collision_mask
 	campus_player.locomotion.set_flight_mode(true)
-	check(campus_player.collision_mask == 0, "Flight mode disables player collisions")
+	check(campus_player.collision_mask == walking_collision_mask and (campus_player.collision_mask & 1) != 0, "Flight mode preserves world collision mask")
 	campus_player.locomotion.set_flight_mode(false)
 	check(campus_player.collision_mask == walking_collision_mask, "Walking mode restores player collisions")
+	await frames(2)
+	check(campus_player.is_on_floor(), "Campus player is grounded before jump")
+	campus_player.locomotion.tick(1.0 / 60.0, Vector2.ZERO, 0.0, true, 0.0, true)
+	check(campus_player.velocity.y > 0.0, "Grounded player can jump")
+	campus_player.locomotion.tick(1.0 / 60.0, Vector2.ZERO, 0.0, true, 0.0, true)
+	check(campus_player.velocity.y < VRLocomotion.JUMP_VELOCITY, "Jump input does not retrigger while airborne")
+	campus_player.input_adapter._register_desktop_jump_press(1000)
+	check(campus_player.input_adapter.jump_pressed(), "First Space press jumps")
+	campus_player.input_adapter._register_desktop_jump_press(1200)
+	check(campus_player.input_adapter.flight_toggle_pressed(), "Double Space toggles flight")
+	check(not campus_player.input_adapter.jump_pressed(), "Double Space does not trigger a second jump")
+	campus_player.input_adapter._register_desktop_jump_press(2000)
+	campus_player.input_adapter._register_desktop_jump_press(2400)
+	check(campus_player.input_adapter.jump_pressed(), "Space presses outside the double-tap window remain jumps")
+	campus_player.input_adapter.update_desktop_actions()
 	Input.action_press(&"desktop_fly_toggle")
 	check(campus_player.input_adapter.flight_toggle_pressed(), "Desktop flight toggle input")
 	Input.action_release(&"desktop_fly_toggle")

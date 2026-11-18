@@ -4,6 +4,16 @@ extends Node3D
 const CAMPUS_BUILDING_SCRIPT: Script = preload("res://features/campus/campus_building.gd")
 const GLB_UNIT_CORRECTION: float = 0.1
 const CAMPUS_SCALE: float = 3.0
+const CAMPUS_FLOOR_COLOR: Color = Color(0.19, 0.25, 0.22, 1.0)
+const BUILDING_TERRACOTTA: Color = Color(0.72, 0.36, 0.26, 1.0)
+const CAMPUS_DARK_GRAY: Color = Color(0.2, 0.2, 0.2, 1.0)
+const INACAP_LETTER_BLACK: Color = Color.BLACK
+const INACAP_RED: Color = Color(0.78, 0.12, 0.08, 1.0)
+const DARK_GRAY_MATERIAL_NAMES: Array[StringName] = [
+	&"Cielo_Marfil__base", &"Letras_Blancas__base", &"Linea_Blanca__base",
+	&"Marco_Blanco__base", &"Reciclaje_Blanco__base", &"Suelo_Blanco_Roto",
+	&"Zinc_Claro__base"
+]
 const INTERACTIVE_BUILDINGS: Array[StringName] = [
 	&"A", &"Achoclonados", &"B", &"C", &"D", &"E", &"F", &"G", &"H", &"J",
 	&"L", &"L_Anexo", &"La_Minga", &"Tienda"
@@ -17,7 +27,10 @@ const BUILDING_LABELS: Dictionary[StringName, String] = {
 
 @export_file("*.glb") var source_model: String = "res://assets/models/scene.glb"
 
-var _two_sided_materials: Dictionary = {}
+var _terracotta_materials: Dictionary = {}
+var _floor_materials: Dictionary = {}
+var _colorized_materials: Dictionary = {}
+var _inacap_black_materials: Dictionary = {}
 
 func _ready() -> void:
 	if not FileAccess.file_exists(source_model):
@@ -76,10 +89,19 @@ func _collect_mesh_data(node: Node, parent_transform: Transform3D, records: Arra
 			var material := mesh_instance.get_surface_override_material(surface_index)
 			if material == null:
 				material = source_mesh.surface_get_material(surface_index)
+			var object_name := _base_object_name(mesh_instance.name)
+			var surface_material: Material
+			var colorized_material := _get_colorized_material(material, object_name)
+			if colorized_material != null:
+				surface_material = colorized_material
+			elif INTERACTIVE_BUILDINGS.has(object_name):
+				surface_material = _get_terracotta_material(material)
+			else:
+				surface_material = _get_floor_color_material(material)
 			records.append({
-				"name": _base_object_name(mesh_instance.name),
+				"name": object_name,
 				"arrays": arrays,
-				"material": _get_two_sided_material(material)
+				"material": surface_material
 			})
 	for child: Node in node.get_children():
 		_collect_mesh_data(child, model_transform, records)
@@ -91,15 +113,58 @@ func _base_object_name(node_name: StringName) -> StringName:
 		name = name.substr(0, part_marker)
 	return StringName(name)
 
-func _get_two_sided_material(material: Material) -> Material:
-	if material == null or not material is BaseMaterial3D:
-		return material
-	if _two_sided_materials.has(material):
-		return _two_sided_materials[material] as Material
-	var duplicate := material.duplicate(true) as BaseMaterial3D
-	duplicate.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_two_sided_materials[material] = duplicate
-	return duplicate
+func _get_floor_color_material(material: Material) -> Material:
+	if material != null and _floor_materials.has(material):
+		return _floor_materials[material] as Material
+	var floor_material: BaseMaterial3D
+	if material is BaseMaterial3D:
+		floor_material = (material as BaseMaterial3D).duplicate(true) as BaseMaterial3D
+	else:
+		floor_material = StandardMaterial3D.new()
+	floor_material.albedo_color = CAMPUS_FLOOR_COLOR
+	floor_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if material != null:
+		_floor_materials[material] = floor_material
+	return floor_material
+
+func _get_colorized_material(material: Material, object_name: StringName) -> Material:
+	if material == null:
+		return null
+	var material_name := StringName(material.resource_name)
+	var surface_color: Color
+	var color_cache := _colorized_materials
+	if String(material_name).begins_with("Rojo_INACAP"):
+		surface_color = INACAP_RED
+	elif object_name == &"Letras_INACAP" and material_name == &"Letras_Blancas__base":
+		surface_color = INACAP_LETTER_BLACK
+		color_cache = _inacap_black_materials
+	elif DARK_GRAY_MATERIAL_NAMES.has(material_name):
+		surface_color = CAMPUS_DARK_GRAY
+	else:
+		return null
+	if color_cache.has(material):
+		return color_cache[material] as Material
+	if not material is BaseMaterial3D:
+		return null
+	var colorized_material := (material as BaseMaterial3D).duplicate(true) as BaseMaterial3D
+	colorized_material.albedo_color = surface_color
+	colorized_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	color_cache[material] = colorized_material
+	return colorized_material
+
+func _get_terracotta_material(material: Material) -> Material:
+	if material != null and _terracotta_materials.has(material):
+		return _terracotta_materials[material] as Material
+	var terracotta: BaseMaterial3D
+	if material is BaseMaterial3D:
+		terracotta = (material as BaseMaterial3D).duplicate(true) as BaseMaterial3D
+	else:
+		terracotta = StandardMaterial3D.new()
+	terracotta.cull_mode = BaseMaterial3D.CULL_DISABLED
+	terracotta.albedo_color = BUILDING_TERRACOTTA
+	if material != null:
+		_terracotta_materials[material] = terracotta
+	return terracotta
 
 func _build_campus(mesh_records: Array[Dictionary]) -> void:
 	var objects: Dictionary = {}
